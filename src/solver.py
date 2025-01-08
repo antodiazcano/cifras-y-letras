@@ -9,6 +9,14 @@ import re
 import time
 
 from src.utils import list_contained, valid_parenthesis
+from src.constants import (
+    MAX_TIME,
+    FOLLOWED_PARENTHESIS,
+    MAX_PARENTHESIS,
+    MAX_DEPTH,
+    OPERATIONS,
+    OP_WITH_PARENTHESIS,
+)
 
 
 class Solver:
@@ -21,9 +29,6 @@ class Solver:
         self,
         available_numbers: list[int],
         objective: int,
-        max_time: float = 45.0,
-        n_parenthesis: int = 1,
-        max_depth: int = 5,
     ) -> None:
         """
         Constructor of the class.
@@ -39,22 +44,33 @@ class Solver:
 
         self.available_numbers = available_numbers
         self.objective = objective
-        self.max_time = max_time
-        self.max_depth = max_depth
 
         self.best_solution = ""
         self.best_value = objective
 
         self.possibilities = [str(x) for x in available_numbers]
-        for i in range(1, n_parenthesis + 1):
+        for i in range(1, FOLLOWED_PARENTHESIS + 1):
             self.possibilities += [f"{'('*i}{x}" for x in available_numbers]
             self.possibilities += [f"{x}{')'*i}" for x in available_numbers]
-        self.operations = ["+", "-", "*"]  # "/"]
-        # There are some operations that do not need parenthesis after, for example sum
-        # and subtraction: 1 + (2 * 3) = 1 + 2 * 3 = 6.
-        self.op_with_parenthesis = ["*"]
 
-    def is_valid(self, solution: str) -> bool:
+        self.lower_bound, self.upper_bound = self._get_bounds()
+
+    def _get_bounds(self) -> tuple[int, int]:
+        """
+        Obtains an upper bound to bound solutions.
+
+        Returns
+        -------
+        Upper and lower bounds.
+        """
+
+        max_elements = sorted(self.available_numbers, reverse=True)[:2]
+        lower_bound = self.objective // max_elements[0]
+        upper_bound = self.objective + max_elements[0] * max_elements[1]
+
+        return lower_bound, upper_bound
+
+    def _is_valid(self, solution: str) -> bool:
         """
         Checks if more numbers are used than the available ones.
 
@@ -73,8 +89,32 @@ class Solver:
             used_numbers, self.available_numbers
         ) and valid_parenthesis(solution)
 
-    def expand_solutions(
-        self, current_solutions: list[str], solution: str
+    def _prune(self, solution: str, value: int, depth: int) -> bool:
+        """
+        Prunes the solution if its expected value is not promising.
+
+        Parameters
+        ----------
+        solution : Solution.
+        value    : Value of the solution.
+        depth    : Current depth of the solution.
+
+        Returns
+        -------
+        True if we have to bound and False otherwise.
+        """
+
+        if solution.count("(") > MAX_PARENTHESIS:
+            return True
+
+        if depth >= 4:
+            if (value < self.lower_bound and value != -1) or (value > self.upper_bound):
+                return True
+
+        return False
+
+    def _expand_solutions(
+        self, current_solutions: list[str], solution: str, value: int, depth: int
     ) -> list[str]:
         """
         Expands all possible solutions that came from solution and adds them to
@@ -84,6 +124,8 @@ class Solver:
         ----------
         current_solutions : List we want to expand.
         solution          : Solution used to expand the list.
+        value             : Value of the solution.
+        depth             : Depth of the solutions.
 
         Returns
         -------
@@ -91,10 +133,12 @@ class Solver:
         """
 
         for possibility in self.possibilities:
-            for operation in self.operations:
+            for operation in OPERATIONS:
                 new_solution = f"{solution} {operation} {possibility}"
-                if self.is_valid(new_solution):
-                    if operation not in self.op_with_parenthesis:
+                if self._is_valid(new_solution) and not self._prune(
+                    solution, value, depth
+                ):
+                    if operation not in OP_WITH_PARENTHESIS:
                         # "+- (x)" is the same as "+- x" for all x achieved by any
                         # possible combination of operations
                         if "(" not in operation:
@@ -126,7 +170,7 @@ class Solver:
         except ZeroDivisionError:
             return -1, False
 
-    def update_solutions(self, current_solution: str, value: int) -> None:
+    def _update_solutions(self, current_solution: str, value: int) -> None:
         """
         Updates the best solution and value.
 
@@ -159,7 +203,7 @@ class Solver:
             f" Time elapsed: {time_elapsed:.2f} s."
         )
 
-    def exhaustive_search(
+    def solve(
         self,
         current_solutions: list[str] | None = None,
         current_depth: int = 1,
@@ -185,39 +229,45 @@ class Solver:
             current_solutions = []
             for num in self.available_numbers:
                 current_solutions.append(str(num))
-                # current_solutions.append(f"({num}")
+                current_solutions.append(f"({num}")
 
         if initial_time is None:
             initial_time = time.time()
 
         if verbose:
             print(f"Current depth: {current_depth}")
-            print(f"Time elapsed: {time.time() - initial_time:.2f}")
+            print(f"Time elapsed: {time.time() - initial_time:.2f} s")
             print(f"Number of solutions: {len(current_solutions)}\n")
 
         new_current_solutions: list[str] = []
-        seen_solutions: list[int] = []
+        seen_solutions = [
+            False for _ in range(self.upper_bound)
+        ]  # to not repeat equivalent solutions
 
         for current_solution in current_solutions:
             value, expand = self.evaluate_solution(current_solution)
 
-            if current_depth < self.max_depth:
-                if value not in seen_solutions or expand:
-                    seen_solutions.append(value)
-                    self.update_solutions(current_solution, value)
-                    new_current_solutions = self.expand_solutions(
-                        new_current_solutions, current_solution
-                    )
+            if current_depth < MAX_DEPTH:
+                try:
+                    if not seen_solutions[value] or expand:
+                        seen_solutions[value] = True
+                        self._update_solutions(current_solution, value)
+                except IndexError:
+                    self._update_solutions(current_solution, value)
+                new_current_solutions = self._expand_solutions(
+                    new_current_solutions, current_solution, value, current_depth
+                )
             else:
-                self.update_solutions(current_solution, value)
+                self._update_solutions(current_solution, value)
 
-            if self.best_value == 0 or time.time() - initial_time > self.max_time:
-                return self.return_best_solution(time.time() - initial_time)
+            current_time = time.time() - initial_time
+            if self.best_value == 0 or current_time > MAX_TIME:
+                return self.return_best_solution(current_time)
 
-        if current_depth == self.max_depth:
+        if current_depth == MAX_DEPTH:
             self.return_best_solution(time.time() - initial_time)
 
-        return self.exhaustive_search(
+        return self.solve(
             new_current_solutions,
             current_depth + 1,
             initial_time,
