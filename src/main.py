@@ -9,4 +9,4 @@ if __name__ == "__main__":
     OBJECTIVE = 831
 
     SOLVER = Solver(AVAILABLE_NUMBERS, OBJECTIVE)
-    print(SOLVER.exhaustive_search())
+    print(SOLVER.solve())
