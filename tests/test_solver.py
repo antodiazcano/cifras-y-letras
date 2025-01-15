@@ -6,6 +6,7 @@ import re
 import pytest
 
 from src.solver import Solver
+from src.constants import INVALID_EVAL
 
 
 @pytest.mark.parametrize(
@@ -151,3 +152,61 @@ def test_select_solutions(
         value = -1
     depth = len(re.findall(r"\d+", solution))
     assert s._select_solutions([], solution, value, depth) == expected
+
+
+def test_evaluate_solution() -> None:
+    """
+    Test for evaluate_solution.
+    """
+
+    s = Solver([1, 2], 0)
+    solutions = ["2 + 2", "2+2", "2+ 2", "2 +"]
+
+    for solution in solutions:
+        try:
+            assert s.evaluate_solution(solution) == eval(solution)
+        except SyntaxError:
+            assert s.evaluate_solution(solution) == INVALID_EVAL
+
+
+def test_update_solutions() -> None:
+    """
+    Test for the _update_solutions function.
+    """
+
+    s = Solver([1, 2, 3], 10)
+
+    # Update
+    solution = "5 + 5"
+    value = eval(solution)
+    s._update_solutions(solution, value)
+    assert s.best_solution == solution and s.best_value == abs(s.objective - value)
+
+    # No update
+    solution = "5 + 9"
+    value = 11
+    s._update_solutions(solution, value)
+    assert s.best_solution != solution and s.best_value != abs(s.objective - value)
+
+
+def test_return_best_solution() -> None:
+    """
+    Test for return_best_solution.
+    """
+
+    s = Solver([2, 3], 10)
+    solution = "5 + 4"
+    value = eval(solution)
+    s._update_solutions(solution, value)
+    time = 10
+    expected = f"{solution} = {value}. Time elapsed: {time:.2f} s."
+
+    assert s.return_best_solution(time) == expected
+
+
+def test_expand_current_solution() -> None:
+    """
+    Test for _expand_current_solution.
+    """
+
+    pass

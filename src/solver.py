@@ -211,7 +211,7 @@ class Solver:
 
         return (
             f"{self.best_solution} = {self.evaluate_solution(self.best_solution)}. "
-            f" Time elapsed: {time_elapsed:.2f} s."
+            f"Time elapsed: {time_elapsed:.2f} s."
         )
 
     def _expand_current_solution(
