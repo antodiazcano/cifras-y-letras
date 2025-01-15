@@ -2,6 +2,7 @@
 This script contains the test for the solver.py.
 """
 
+import re
 import pytest
 
 from src.solver import Solver
@@ -9,7 +10,7 @@ from src.solver import Solver
 
 @pytest.mark.parametrize(
     "available_numbers, objective, expected",
-    [([3, 4, 5], 20, (4, 40)), ([10, 4, 6, 7], 193, (19, 263))],
+    [([3, 4, 5], 20, (6, 40)), ([10, 4, 6, 7], 193, (48, 263))],
 )
 def test_get_bounds(
     available_numbers: list[int], objective: int, expected: tuple[int, int]
@@ -85,15 +86,68 @@ def test_prune(solution: str, value: int, depth: int, expected: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    "",
-    [()],
+    "available_numbers, solution, expected",
+    [
+        (
+            [1, 2, 3, 4, 5],
+            "1 + 2 * (3",
+            [
+                "1 + 2 * (3 + 4",
+                "1 + 2 * (3 - 4",
+                "1 + 2 * (3 * 4",
+                "1 + 2 * (3 + 5",
+                "1 + 2 * (3 - 5",
+                "1 + 2 * (3 * 5",
+                "1 + 2 * (3 + (4",
+                "1 + 2 * (3 - (4",
+                "1 + 2 * (3 * (4",
+                "1 + 2 * (3 + (5",
+                "1 + 2 * (3 - (5",
+                "1 + 2 * (3 * (5",
+                "1 + 2 * (3 + 4)",
+                "1 + 2 * (3 - 4)",
+                "1 + 2 * (3 * 4)",
+                "1 + 2 * (3 + 5)",
+                "1 + 2 * (3 - 5)",
+                "1 + 2 * (3 * 5)",
+            ],
+        ),
+        ([1, 2, 3], "1 + 2 * 3", []),
+        ([1, 2, 3], "1 + 2 * )3", []),
+        ([1, 20_000, 3, 4], "20_000 + 1 * 3", []),
+        (
+            [1, 2, 3, 4],
+            "1 + 2 * 3",
+            [
+                "1 + 2 * 3 + 4",
+                "1 + 2 * 3 - 4",
+                "1 + 2 * 3 * 4",
+                "1 + 2 * 3 + (4",
+                "1 + 2 * 3 - (4",
+                "1 + 2 * 3 * (4",
+            ],
+        ),
+    ],
 )
-def test_expand_solutions() -> None:
+def test_select_solutions(
+    available_numbers: list[int],
+    solution: str,
+    expected: list[str],
+) -> None:
     """
-    Test for the _expand_solutions function.
+    Test for the _select_solutions function.
 
     Parameters
     ----------
+    available_numbers : Available numbers.
+    solution          : Solution to expand.
+    expected          : Expected output.
     """
 
-    pass
+    s = Solver(available_numbers, 10)
+    try:
+        value = eval(solution)
+    except SyntaxError:
+        value = -1
+    depth = len(re.findall(r"\d+", solution))
+    assert s._select_solutions([], solution, value, depth) == expected

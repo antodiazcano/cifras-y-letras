@@ -14,8 +14,10 @@ from src.constants import (
     FOLLOWED_PARENTHESIS,
     MAX_PARENTHESIS,
     MAX_DEPTH,
+    PRUNE_DEPTH,
     OPERATIONS,
     OP_WITH_PARENTHESIS,
+    INVALID_EVAL,
 )
 
 
@@ -65,7 +67,7 @@ class Solver:
         """
 
         max_elements = sorted(self.available_numbers, reverse=True)[:2]
-        lower_bound = self.objective // max_elements[0]
+        lower_bound = self.objective // min(self.available_numbers)
         upper_bound = self.objective + max_elements[0] * max_elements[1]
 
         return lower_bound, upper_bound
@@ -107,13 +109,15 @@ class Solver:
         if solution.count("(") > MAX_PARENTHESIS:
             return True
 
-        if depth >= 4:
-            if (value < self.lower_bound and value != -1) or (value > self.upper_bound):
+        if depth >= PRUNE_DEPTH:
+            if (value < self.lower_bound and value != INVALID_EVAL) or (
+                value > self.upper_bound
+            ):
                 return True
 
         return False
 
-    def _expand_solutions(
+    def _select_solutions(
         self, current_solutions: list[str], solution: str, value: int, depth: int
     ) -> list[str]:
         """
@@ -148,7 +152,7 @@ class Solver:
 
         return current_solutions
 
-    def evaluate_solution(self, solution: str) -> tuple[int, bool]:
+    def evaluate_solution(self, solution: str) -> int:
         """
         Evaluates the value of a solution.
 
@@ -158,17 +162,13 @@ class Solver:
 
         Returns
         -------
-        Value of the solution (-1) if it is not valid and flag indicating if it is valid
-        or not.
+        Value of the solution (INVALID_EVAL if it is not valid).
         """
 
         try:
-            value = eval(solution)
-            return value, True
+            return eval(solution)
         except SyntaxError:  # in the future it may will be valid
-            return -1, True
-        except ZeroDivisionError:
-            return -1, False
+            return INVALID_EVAL
 
     def _update_solutions(self, current_solution: str, value: int) -> None:
         """
@@ -180,7 +180,18 @@ class Solver:
         value            : Value of the current solution.
         """
 
-        diff = abs(value - self.objective)
+        diff = value - self.objective
+
+        if abs(diff) in self.available_numbers and current_solution.count(
+            str(diff)
+        ) < self.available_numbers.count(diff):
+            if diff < 0:
+                current_solution += f" + {diff}"
+            else:
+                current_solution += f" - {diff}"
+            diff = 0
+
+        diff = abs(diff)
         if diff < self.best_value:
             self.best_solution = current_solution
             self.best_value = diff
@@ -199,9 +210,49 @@ class Solver:
         """
 
         return (
-            f"{self.best_solution} = {eval(self.best_solution)}. "
+            f"{self.best_solution} = {self.evaluate_solution(self.best_solution)}. "
             f" Time elapsed: {time_elapsed:.2f} s."
         )
+
+    def _expand_current_solution(
+        self,
+        current_solution: str,
+        seen_solutions: list[bool],
+        current_depth: int,
+        new_current_solutions: list[str],
+    ) -> tuple[list[str], list[bool]]:
+        """
+        Expands all valid and promising solutions from the current one.
+
+        Parameters
+        ----------
+        current_solution      : Solution we will expand.
+        seen_solutions        : Solutions already seen.
+        current_depth         : Current depth of the solution.
+        new_current_solutions : List to store new solutions for next depth.
+
+        Returns
+        -------
+        Updated list of new_current_solutions and seen_solutions.
+        """
+
+        value = self.evaluate_solution(current_solution)
+
+        if current_depth < MAX_DEPTH:
+            if (0 < value < self.upper_bound) and (not seen_solutions[value]):
+                seen_solutions[value] = True
+                self._update_solutions(current_solution, value)
+                new_current_solutions = self._select_solutions(
+                    new_current_solutions, current_solution, value, current_depth
+                )
+            elif value == INVALID_EVAL:
+                new_current_solutions = self._select_solutions(
+                    new_current_solutions, current_solution, value, current_depth
+                )
+        else:  # not expand to avoid losing time
+            self._update_solutions(current_solution, value)
+
+        return new_current_solutions, seen_solutions
 
     def solve(
         self,
@@ -225,13 +276,13 @@ class Solver:
         Best solution found.
         """
 
-        if current_solutions is None:
+        if current_solutions is None:  # initialize possible solutions
             current_solutions = []
             for num in self.available_numbers:
                 current_solutions.append(str(num))
-                current_solutions.append(f"({num}")
+                # current_solutions.append(f"({num}")
 
-        if initial_time is None:
+        if initial_time is None:  # initialize time
             initial_time = time.time()
 
         if verbose:
@@ -245,27 +296,19 @@ class Solver:
         ]  # to not repeat equivalent solutions
 
         for current_solution in current_solutions:
-            value, expand = self.evaluate_solution(current_solution)
-
-            if current_depth < MAX_DEPTH:
-                try:
-                    if not seen_solutions[value] or expand:
-                        seen_solutions[value] = True
-                        self._update_solutions(current_solution, value)
-                except IndexError:
-                    self._update_solutions(current_solution, value)
-                new_current_solutions = self._expand_solutions(
-                    new_current_solutions, current_solution, value, current_depth
-                )
-            else:
-                self._update_solutions(current_solution, value)
+            new_current_solutions, seen_solutions = self._expand_current_solution(
+                current_solution, seen_solutions, current_depth, new_current_solutions
+            )
 
             current_time = time.time() - initial_time
             if self.best_value == 0 or current_time > MAX_TIME:
                 return self.return_best_solution(current_time)
 
         if current_depth == MAX_DEPTH:
-            self.return_best_solution(time.time() - initial_time)
+            _, _ = self._expand_current_solution(
+                self.best_solution, seen_solutions, current_depth, new_current_solutions
+            )  # one last try, expand the best solution (only one) found
+            return self.return_best_solution(time.time() - initial_time)
 
         return self.solve(
             new_current_solutions,
