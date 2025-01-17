@@ -3,10 +3,11 @@ This script contains the test for the solver.py.
 """
 
 import re
+import time
 import pytest
 
 from src.solver import Solver
-from src.constants import INVALID_EVAL
+from src.constants import INVALID_EVAL, MAX_DEPTH, MAX_TIME
 
 
 @pytest.mark.parametrize(
@@ -174,17 +175,32 @@ def test_update_solutions() -> None:
     Test for the _update_solutions function.
     """
 
-    s = Solver([1, 2, 3], 10)
-
     # Update
+    s = Solver([1, 2, 3], 10)
     solution = "5 + 5"
     value = eval(solution)
     s._update_solutions(solution, value)
     assert s.best_solution == solution and s.best_value == abs(s.objective - value)
 
-    # No update
+    # Update and positive difference in available numbers
+    s = Solver([1, 2, 3], 10)
+    solution = "5 + 7"
+    value = eval(solution)
+    s._update_solutions(solution, value)
+    assert s.best_value == 0
+
+    # Update and negative difference in available numbers
+    s = Solver([1, 2, 3], 10)
+    solution = "5 + 2"
+    value = eval(solution)
+    s._update_solutions(solution, value)
+    assert s.best_value == 0
+
+    # No update if a better solution was previously found
+    s = Solver([1, 2, 3], 10)
+    s._update_solutions("5 + 6", 11)
     solution = "5 + 9"
-    value = 11
+    value = eval(solution)
     s._update_solutions(solution, value)
     assert s.best_solution != solution and s.best_value != abs(s.objective - value)
 
@@ -209,4 +225,63 @@ def test_expand_current_solution() -> None:
     Test for _expand_current_solution.
     """
 
-    pass
+    s = Solver([10, 20, 30], 50)
+    seen_solutions = [False for _ in range(s.upper_bound)]
+    current_depth = MAX_DEPTH - 1
+    solution = "20 - 5"
+    value = eval(solution)
+    current_solutions: list[str] = []
+
+    # Normal case
+    new_current_solutions, seen_solutions = s._expand_current_solution(
+        solution, seen_solutions, current_depth, current_solutions
+    )
+    assert (
+        new_current_solutions
+        == s._select_solutions(current_solutions, solution, value, current_depth)
+        and seen_solutions[value]
+    )
+
+    # Max depth case
+    new_current_solutions_2, seen_solutions_2 = s._expand_current_solution(
+        solution, seen_solutions, MAX_DEPTH, current_solutions
+    )
+    assert (
+        new_current_solutions_2 == new_current_solutions
+        and seen_solutions_2 == seen_solutions
+    )
+
+    # A solution that must not be expanded
+    solution = "3 * 5"
+    value = eval(solution)
+    seen_solutions[value] = True
+    current_depth = MAX_DEPTH - 1
+    new_current_solutions_3, seen_solutions_3 = s._expand_current_solution(
+        solution, seen_solutions, current_depth, current_solutions
+    )
+    assert (
+        new_current_solutions_3 == current_solutions
+        and seen_solutions_3 == seen_solutions
+    )
+
+
+def test_solve() -> None:
+    """
+    Test for the solve function.
+    """
+
+    available_numbers = [1, 2, 3, 4, 5]
+    objective = 15  # 1 + 2 * (3 + 4)
+    s = Solver(available_numbers, objective)
+    t0 = time.time()
+    s.solve()
+    tf = time.time()
+    assert eval(s.best_solution) == objective and tf - t0 <= MAX_TIME
+
+    available_numbers = [1, 2, 3, 4, 5]
+    objective = 99  # 1 + 2 * (3 + 4)
+    s = Solver(available_numbers, objective)
+    t0 = time.time()
+    s.solve(current_depth=MAX_DEPTH)
+    t0 = time.time()
+    assert tf - t0 <= MAX_TIME

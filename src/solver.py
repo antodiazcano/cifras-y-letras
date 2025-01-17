@@ -142,12 +142,11 @@ class Solver:
                 if self._is_valid(new_solution) and not self._prune(
                     solution, value, depth
                 ):
-                    if operation not in OP_WITH_PARENTHESIS:
+                    if operation not in OP_WITH_PARENTHESIS and "(" not in operation:
                         # "+- (x)" is the same as "+- x" for all x achieved by any
                         # possible combination of operations
-                        if "(" not in operation:
-                            current_solutions.append(new_solution)
-                    else:
+                        current_solutions.append(new_solution)
+                    elif operation in OP_WITH_PARENTHESIS:
                         current_solutions.append(new_solution)
 
         return current_solutions
@@ -181,20 +180,20 @@ class Solver:
         """
 
         diff = value - self.objective
+        abs_diff = abs(diff)
 
-        if abs(diff) in self.available_numbers and current_solution.count(
-            str(diff)
-        ) < self.available_numbers.count(diff):
+        if abs_diff in self.available_numbers and current_solution.count(
+            str(abs_diff)
+        ) < self.available_numbers.count(abs_diff):
             if diff < 0:
-                current_solution += f" + {diff}"
+                current_solution += f" + {abs_diff}"
             else:
-                current_solution += f" - {diff}"
-            diff = 0
+                current_solution += f" - {abs_diff}"
+            abs_diff = 0
 
-        diff = abs(diff)
-        if diff < self.best_value:
+        if abs_diff < self.best_value:
             self.best_solution = current_solution
-            self.best_value = diff
+            self.best_value = abs_diff
 
     def return_best_solution(self, time_elapsed: float) -> str:
         """
