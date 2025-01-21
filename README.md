@@ -1,34 +1,10 @@
-# template-project
+This repo contains a solution for the "Cifras" problem in the Spanish TV show "Cifras y Letras". The problem is the folowing:
+- You are given an **objective** number.
+- You are given a list of **available numbers** you can combine with the operations $+, -, \cdot$ and $/$.
+- You have to obtain the nearest number possible to the objective number within $45$ seconds.
 
-## What to do at first
+For example, if the objective is $19$ and the available numbers are $[6, 2, 3, 1, 5, 2]$ a possible solution is $6\cdot 3+2=20$ but the best solution would be $5\cdot 2\cdot 2 -1=19$ or $6\cdot 3 + 1=19$.
 
-At first, execute in terminal:
+To run the program execute in command line
 
-    uv init
-
-Then, activate the virtual environment (add at least one package first and it will be automaically created):
-
-    source .venv/bin/activate
-
-Each time a new package is included use:
-
-    uv add package
-
-
-## Sanity Checks
-
-They are executed in each push, but if you want to check code and typing style before pushing please follow these steps:
-
-    pytest .
-    black --check .
-    ruff check
-    mypy src tests
-    flake8 src tests
-    pylint src tests
-
-
-## Others
-
-To see the documentation run:
-
-    mkdocs serve
+    python -m src.main 
