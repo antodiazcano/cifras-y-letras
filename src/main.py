@@ -2,30 +2,38 @@
 Main script to solve the problem.
 """
 
+import argparse
+
 from src.solver import Solver
 
 
-def main(available_numbers: list[int], objective: int) -> str:
+def main() -> None:  # pragma: no cover
     """
-    Obtains the solution for a given problem.
-
-    Parameters
-    ----------
-    available_numbers : Available numbers for the operations.
-    objective         : Objective number.
-
-    Returns
-    -------
-    Best solution found.
+    Parse arguments, solve the problem and print the solution.
     """
 
+    parser = argparse.ArgumentParser(
+        description="Solve the problem with the given numbers and objective."
+    )
+    parser.add_argument(
+        "--nums",
+        type=str,
+        required=True,
+        help="List of available numbers, separated by commas.",
+    )
+    parser.add_argument(
+        "--obj",
+        type=int,
+        required=True,
+        help="The target number to achieve.",
+    )
+    args = parser.parse_args()
+
+    available_numbers = list(map(int, args.nums.split(",")))
+    objective = args.obj
     solver = Solver(available_numbers, objective)
-    solver.solve()
-    return solver.best_solution
+    print(solver.solve())
 
 
-if __name__ == "__main__":  # pragma: no cover
-    AVAILABLE_NUMBERS = [3, 25, 9, 8, 6, 7]
-    OBJECTIVE = 831
-
-    main(AVAILABLE_NUMBERS, OBJECTIVE)
+if __name__ == "__main__":
+    main()

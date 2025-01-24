@@ -7,4 +7,6 @@ For example, if the objective is $19$ and the available numbers are $[6, 2, 3, 1
 
 To run the program execute in command line
 
-    python -m src.main 
+    python -m src.main --nums 3,25,9,8,6,7 --obj 831
+
+where ```--nums``` are the available numbers and ```--obj``` is the objective.
