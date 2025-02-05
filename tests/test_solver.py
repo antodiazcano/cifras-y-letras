@@ -265,6 +265,24 @@ def test_expand_current_solution() -> None:
     )
 
 
+def test_expand_last_try() -> None:
+    """
+    Test for the _expand_last_try function.
+    """
+
+    s = Solver([10, 20, 5], 50)
+    s.best_solution = "10 + 20"
+    s.best_value = 20
+    s._expand_last_try()
+    assert s.best_solution == "10 + 20 + 5" and s.best_value == 15
+
+    s = Solver([45, 20, 5], 50)
+    s.best_solution = "45 + 20"
+    s.best_value = 15
+    s._expand_last_try()
+    assert s.best_solution == "45 + 20 - 5" and s.best_value == 10
+
+
 def test_solve() -> None:
     """
     Test for the solve function.

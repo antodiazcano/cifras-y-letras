@@ -253,6 +253,33 @@ class Solver:
 
         return new_current_solutions, seen_solutions
 
+    def _expand_last_try(self) -> None:
+        """
+        Tries to improve the approximation in case the maximum time is reached. It is
+        supposed 5 numbers are used.
+        """
+
+        # Obtain the number that is not still used
+        copy_numbers = self.available_numbers[:]
+        used_numbers = [int(x) for x in re.findall(r"\d+", self.best_solution)]
+        for num in used_numbers:
+            if num in copy_numbers:
+                copy_numbers.remove(num)
+        num = copy_numbers[0]
+
+        # See if we can improve
+        current_sol = self.evaluate_solution(self.best_solution)
+        if current_sol > self.objective:
+            diff = abs(current_sol - num - self.objective)
+            if diff < self.best_value:
+                self.best_solution += f" - {num}"
+                self.best_value = diff
+        else:
+            diff = abs(current_sol + num - self.objective)
+            if diff < self.best_value:
+                self.best_solution += f" + {num}"
+                self.best_value = diff
+
     def solve(
         self,
         current_solutions: list[str] | None = None,
@@ -300,13 +327,17 @@ class Solver:
             )
 
             current_time = time.time() - initial_time
-            if self.best_value == 0 or current_time > MAX_TIME:
+            if self.best_value == 0:
+                return self.return_best_solution(current_time)
+            if current_time > MAX_TIME:  # pragma: no cover
+                self._expand_last_try()
                 return self.return_best_solution(current_time)
 
         if current_depth == MAX_DEPTH:
             _, _ = self._expand_current_solution(
                 self.best_solution, seen_solutions, current_depth, new_current_solutions
             )  # one last try, expand the best solution (only one) found
+            self._expand_last_try()
             return self.return_best_solution(time.time() - initial_time)
 
         return self.solve(
